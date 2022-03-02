@@ -1,0 +1,116 @@
+'
+Data Mining Principles | Assignment 2
+Azizha Zeinita | 12334537
+'
+
+```{r}
+library("knitr")
+library(ggplot2)
+library(cluster)
+library(factoextra)
+library(gridExtra)
+library(MASS)
+
+data <- Boston
+```
+
+
+'1. Select the numeric variables that you think are appropriate and useful. 
+Use kmeans and Gaussian Mixture models.'
+
+#Select the numeric variables
+```{r}
+rm=data[,7]
+dis=data[,9]
+crim=data[,1]
+medv=data[,14]
+df <- data.frame(rm,dis,crim,medv)
+
+X<- sample(c(rep(0, 0.7 * nrow(df)), rep(1, 0.3 * nrow(df))))
+table(X)
+train <- df[X == 0, ]  
+test <- df[X== 1, ]   
+```
+
+'2. Split into train and test (70-30). Scale the data'
+```{r}
+X.train.mean = colMeans(train)
+X.train.sd   = sapply(train, sd)
+X.train.scale  = scale(train, center=X.train.mean, scale=X.train.sd)
+X.test.scale   = scale(test, center=X.train.mean, scale=X.train.sd) #scaling test by train parameters
+```
+
+'3. Generate the K-means solution'
+```{r}
+vaf = c()
+centroid = c()
+size = c()
+num_clusters = seq(2, 10, by=1)
+for (i in num_clusters){
+  set.seed(123)
+  kmeans_train = kmeans(X.train.scale,centers=i,nstart=70)
+  vaf = append(vaf,1 - kmeans_train$tot.withinss / kmeans_train$totss)
+  centroid = append(centroid, kmeans_train$centers)
+  size = append(size,kmeans_train$size)
+}
+```
+
+'4. Perform a Scree test | 5. Show the scree plot.'
+```{r}
+qplot(c(2:10), vaf) +
+  geom_line() +
+  xlab("# Cluster") +
+  ylab("vaf") +
+  ggtitle("Elbow Scree Plot") +
+  ylim(0.3,1)
+```
+
+'6.Choose 1 K-means solution (the best K from the last step) to retain from the many 
+solutions that you have generated'
+```{r}
+kmeans_train_single = kmeans(X.train.scale,centers=5,nstart=70)
+kmeans_test_single = kmeans(X.train.scale,centers=kmeans_train_single$centers,nstart=70)
+
+vaf_train = 1 - kmeans_train_single$tot.withinss / kmeans_train_single$totss
+centroid_train = kmeans_train_single$centers
+size_train = kmeans_train_single$size
+
+vaf_test = 1 - kmeans_test_single$tot.withinss / kmeans_test_single$totss
+centroid_test = kmeans_test_single$centers
+size_test = kmeans_test_single$size
+
+
+print(data.frame(vaf_train,vaf_test))
+print(data.frame(centroid_train,centroid_test))
+print(data.frame(size_train,size_test))
+```
+
+'7. Generate 3-5 Gaussian Mixtures (GM) | 8. Choose one solution & do interpretation'
+```{r}
+require(mclust)
+set.seed(123)
+gm = Mclust(X.train.scale,G=3:5)
+gm$bic #bic value of the selected model
+gm$BIC #based on the table shown, the selected model is GMM with number of component=5 and model=VEV
+summary(gm) #most of the data are clustered in cluster 3 (51.23%), and the least is in cluster 3 (2.25%)
+```
+
+'9. Build a GM model with the best components on train data 
+and compare it with the train KMeans solution from an interpretability perspective'
+```{r}
+p1 = fviz_cluster(kmeans_train_single,geom = "point", data=X.train.scale) + ggtitle("K-Means")
+p2 = fviz_cluster(gm,geom = "point", data=X.train.scale) + ggtitle("GM G=5")
+grid.arrange(p1, p2, nrow = 2)
+
+kmeans_train_single$centers
+gm$parameters$mean
+```
+
+'10. Summarize results and interpret the clusters/segments you choose as your final solution.'
+```{r}
+kmeans_train_single$centers
+kmeans_train_single$size
+gm$parameters$mean
+summary(gm)
+```
+'All interpretations are available in pdf document'
